@@ -13,6 +13,7 @@ Universal keyboard shortcuts cheatsheet plugin for Noctalia that **automatically
 - **Without Description section** - binds with no description are surfaced, not dropped; add a custom description or hide them inline
 - **Full per-category color customization** - background + text color for every key category, with live preview and clipboard quick-paste
 - **Search filter** - type to filter keybindings in the panel
+- **Classic and Minimal panel skins** — Classic keeps the original colored key badges; Minimal uses compact, theme-aware text keys with action labels on the left and shortcuts on the right.
 - **Configurable paths & parser mode** - custom config locations and forced Lua/conf parser in settings
 - **Smart key formatting** - XF86 keys display as readable names (Vol Up, Bright Down, etc.)
 - **Flexible column layout** (1-4 columns) with auto-height

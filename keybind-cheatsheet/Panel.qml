@@ -21,6 +21,27 @@ Item {
   property int settingsHeight: cfg.windowHeight ?? defaults.windowHeight ?? 0
   property bool autoHeight: cfg.autoHeight ?? defaults.autoHeight ?? true
   property int columnCount: cfg.columnCount ?? defaults.columnCount ?? 3
+  property string appearance: cfg.appearance ?? defaults.appearance ?? "classic"
+  readonly property bool isMinimal: appearance === "minimal"
+  readonly property real minimumColumnWidth: 280 * Style.uiScaleRatio
+  readonly property real columnGutter: isMinimal ? 28 * Style.uiScaleRatio : Style.marginS
+  readonly property real sectionHeaderHeight: 40 * Style.uiScaleRatio
+  readonly property real bindRowHeight: 22 * Style.uiScaleRatio
+  readonly property real categoryGap: 10 * Style.uiScaleRatio
+  readonly property real availableWidth: panelOpenScreen ? Math.max(1, panelOpenScreen.width - 40 * Style.uiScaleRatio) : settingsWidth
+  readonly property int effectiveColumnCount: {
+    if (!root.isMinimal)
+      return root.columnCount;
+    var requested = Math.max(1, Math.min(4, root.columnCount));
+    var width = Math.min(root.settingsWidth, root.availableWidth);
+    var horizontalPadding = 36 * Style.uiScaleRatio;
+    var fitCount = Math.floor((width - horizontalPadding + root.columnGutter) /
+                              (root.minimumColumnWidth + root.columnGutter));
+    if (requested === 1 || fitCount < 2)
+      return 1;
+    return Math.max(2, Math.min(requested, fitCount, 4));
+  }
+
 
   // Bug 4 fix: re-evaluate rawCategories whenever Main.qml increments cheatsheetDataVersion
   property int _dataVersion: pluginApi?.mainInstance?.cheatsheetDataVersion ?? 0
@@ -88,9 +109,25 @@ Item {
     updateColumnItems();
     contentPreferredHeight = calculateDynamicHeight();
   }
+  onSettingsWidthChanged: {
+    updateColumnItems();
+    contentPreferredHeight = calculateDynamicHeight();
+  }
+
+  onEffectiveColumnCountChanged: {
+    updateColumnItems();
+    contentPreferredHeight = calculateDynamicHeight();
+  }
+
+  onIsMinimalChanged: {
+    updateColumnItems();
+    contentPreferredHeight = calculateDynamicHeight();
+  }
+
 
   onPanelOpenScreenChanged: {
     // Recalculate height when screen becomes available (important for bar widget opening)
+    updateColumnItems();
     contentPreferredHeight = calculateDynamicHeight();
     root.searchText = "";
     if (searchInput) searchInput.inputItem.forceActiveFocus();
@@ -108,7 +145,7 @@ Item {
     columnItems = []; // Clear old items explicitly
     var assignments = distributeCategories();
     var items = [];
-    for (var i = 0; i < columnCount; i++) {
+    for (var i = 0; i < effectiveColumnCount; i++) {
       items.push(buildColumnItems(assignments[i] || []));
     }
     columnItems = items;
@@ -120,7 +157,7 @@ Item {
 
   property string searchText: ""
 
-  property real contentPreferredWidth: settingsWidth
+  property real contentPreferredWidth: isMinimal ? Math.min(settingsWidth, availableWidth) : settingsWidth
   property real contentPreferredHeight: calculateDynamicHeight()
   readonly property var geometryPlaceholder: panelContainer
   readonly property bool allowAttach: false
@@ -140,6 +177,8 @@ Item {
   readonly property string keyColorShiftOverride: cfg.keyColorShift ?? defaults.keyColorShift ?? ""
   readonly property color keyColorDefault: cfg.keyColorDefault || defaults.keyColorDefault || "#6C757D"
   readonly property color keyLabelColor:   cfg.keyLabelColor   || defaults.keyLabelColor   || "#FFFFFF"
+  readonly property string keyLabelColorOverride:
+    cfg.keyLabelColor && cfg.keyLabelColor !== defaults.keyLabelColor ? cfg.keyLabelColor : ""
   // Empty string = theme-aware fallback (Color.mOnSurface). Any non-empty
   // value is treated as an explicit user override.
   readonly property string descriptionColorOverride: cfg.descriptionTextColor || defaults.descriptionTextColor || ""
@@ -178,17 +217,18 @@ Item {
   property bool isLoading: rawCategories.length === 0
 
   function calculateDynamicHeight() {
+    var scale = Style.uiScaleRatio;
     // If auto height is disabled, use manual height (but still respect screen limit)
     if (!autoHeight && settingsHeight > 0) {
       return Math.min(settingsHeight, maxScreenHeight);
     }
 
-    if (categories.length === 0) return Math.min(400, maxScreenHeight);
+    if (categories.length === 0) return Math.min(root.isMinimal ? 400 * scale : 400, maxScreenHeight);
 
     var assignments = distributeCategories();
     var maxColumnHeight = 0;
 
-    for (var col = 0; col < columnCount; col++) {
+    for (var col = 0; col < effectiveColumnCount; col++) {
       var colHeight = 0;
       var catIndices = assignments[col] || [];
 
@@ -197,10 +237,10 @@ Item {
         if (catIndex >= categories.length) continue;
 
         var cat = categories[catIndex];
-        colHeight += 26; // Header
-        colHeight += cat.binds.length * 20; // Binds
+        colHeight += root.isMinimal ? root.sectionHeaderHeight : 26;
+        colHeight += cat.binds.length * (root.isMinimal ? root.bindRowHeight : 20);
         if (i < catIndices.length - 1) {
-          colHeight += 6; // Spacer
+          colHeight += root.isMinimal ? root.categoryGap : 6;
         }
       }
 
@@ -210,9 +250,11 @@ Item {
     }
 
     // header (45) + content + margins (16)
-    var totalHeight = 45 + maxColumnHeight + 16 + 15 + 15;
+    var totalHeight = root.isMinimal
+      ? 48 * scale + maxColumnHeight + 34 * scale
+      : 45 + maxColumnHeight + 16 + 15 + 15;
     // Limit to 80% of screen height
-    return Math.max(300, Math.min(totalHeight, maxScreenHeight));
+    return Math.max(root.isMinimal ? 300 * scale : 300, Math.min(totalHeight, maxScreenHeight));
   }
 
   // ========== UI ==========
@@ -228,8 +270,8 @@ Item {
       anchors.top: parent.top
       anchors.left: parent.left
       anchors.right: parent.right
-      height: 45
-      color: Color.mSurfaceVariant
+      height: root.isMinimal ? 48 * Style.uiScaleRatio : 45
+      color: root.isMinimal ? "transparent" : Color.mSurfaceVariant
       radius: Style.radiusL
 
       RowLayout {
@@ -239,7 +281,7 @@ Item {
         spacing: Style.marginS
 
         // Title section (centered)
-        Item { Layout.fillWidth: true }
+        Item { Layout.fillWidth: !root.isMinimal }
 
         NIcon {
           icon: "keyboard"
@@ -256,8 +298,18 @@ Item {
           color: Color.mPrimary
         }
 
+        Item { Layout.fillWidth: root.isMinimal }
+
         NTextInput {
           id: searchInput
+          Layout.fillWidth: !root.isMinimal
+          Layout.preferredWidth: root.isMinimal
+            ? Math.min(340 * Style.uiScaleRatio, Math.max(92 * Style.uiScaleRatio, root.contentPreferredWidth * 0.26))
+            : -1
+          Layout.minimumWidth: root.isMinimal
+            ? Math.min(110 * Style.uiScaleRatio, root.contentPreferredWidth * 0.24)
+            : 0
+          Layout.maximumWidth: root.isMinimal ? 340 * Style.uiScaleRatio : Infinity
           placeholderText: pluginApi?.tr("panel.search-placeholder")
           text: root.searchText
 
@@ -267,7 +319,7 @@ Item {
           }
         }
 
-        Item { Layout.fillWidth: true }
+        Item { Layout.fillWidth: !root.isMinimal }
 
         // Refresh button
         NIconButton {
@@ -308,23 +360,27 @@ Item {
       anchors.left: parent.left
       anchors.right: parent.right
       clip: true
-      leftPadding: 35
-      rightPadding: -10
-      topPadding: 15
-      bottomPadding: 15
+      leftPadding: root.isMinimal ? 18 * Style.uiScaleRatio : 35
+      rightPadding: root.isMinimal ? 18 * Style.uiScaleRatio : -10
+      topPadding: root.isMinimal ? 12 * Style.uiScaleRatio : 15
+      bottomPadding: root.isMinimal ? 14 * Style.uiScaleRatio : 15
 
       RowLayout {
         id: mainLayout
-        width: scrollView.availableWidth - Style.marginS
-        spacing: Style.marginS
+        width: root.isMinimal ? Math.max(0, scrollView.availableWidth) : scrollView.availableWidth - Style.marginS
+        spacing: root.isMinimal ? root.columnGutter : Style.marginS
 
         Repeater {
           model: root.columnItems.length
 
           ColumnLayout {
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
+            Layout.preferredWidth: root.isMinimal
+              ? Math.max(0, (mainLayout.width - mainLayout.spacing * (root.effectiveColumnCount - 1)) / root.effectiveColumnCount)
+              : -1
             Layout.alignment: Qt.AlignTop
-            spacing: 2
+            spacing: root.isMinimal ? 0 : 2
 
             property var colItems: root.columnItems[index] || []
 
@@ -332,6 +388,12 @@ Item {
               model: colItems
               Loader {
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.preferredHeight: root.isMinimal
+                  ? (modelData.type === "header" ? root.sectionHeaderHeight :
+                     (modelData.type === "spacer" ? root.categoryGap : Math.max(root.bindRowHeight, item?.implicitHeight || 0)))
+                  : -1
+                Layout.minimumHeight: root.isMinimal ? Layout.preferredHeight : 0
                 sourceComponent: modelData.type === "header" ? headerComponent :
                                (modelData.type === "spacer" ? spacerComponent : bindComponent)
                 property var itemData: modelData
@@ -352,23 +414,27 @@ Item {
   Component {
     id: headerComponent
     ColumnLayout {
-      Layout.preferredWidth: 300
-      Layout.topMargin: Style.marginM
-      Layout.bottomMargin: 4
+      Layout.fillWidth: root.isMinimal
+      Layout.preferredWidth: root.isMinimal ? -1 : 300
+      Layout.minimumWidth: 0
+      Layout.topMargin: root.isMinimal ? 0 : Style.marginM
+      Layout.bottomMargin: root.isMinimal ? 0 : 4
       spacing: 0
 
-      Item { Layout.fillWidth: true; height: 1 }
+      Item { Layout.fillWidth: true; height: root.isMinimal ? 10 * Style.uiScaleRatio : 1 }
 
       NText {
         Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
-        x: parent.width - implicitWidth
+        Layout.fillWidth: root.isMinimal
+        x: root.isMinimal ? 0 : parent.width - implicitWidth
         text: itemData.title
-        font.pointSize: Style.fontSizeM
-        font.weight: Font.Bold
+        font.pointSize: root.isMinimal ? Style.fontSizeS : Style.fontSizeM
+        font.weight: root.isMinimal ? Font.DemiBold : Font.Bold
         color: Color.mPrimary
+        elide: root.isMinimal ? Text.ElideRight : Text.ElideNone
       }
 
-      Item { Layout.fillWidth: true; height: 1 }
+      Item { Layout.fillWidth: true; height: root.isMinimal ? 5 * Style.uiScaleRatio : 1 }
     }
   }
 
@@ -376,22 +442,29 @@ Item {
   Component {
     id: spacerComponent
     Item {
-      height: 10
+      height: root.isMinimal ? root.categoryGap : 10
+      implicitHeight: height
       Layout.fillWidth: true
     }
   }
 
   Component {
     id: bindComponent
-    RowLayout {
+    GridLayout {
       id: bindRow
-      spacing: Style.marginS
-      height: 22
-      Layout.bottomMargin: 1
+      columns: 3
+      rowSpacing: 0
+      columnSpacing: root.isMinimal ? 10 * Style.uiScaleRatio : Style.marginS
+      implicitHeight: root.isMinimal && editing ? Style.baseWidgetSize :
+                      root.isMinimal ? root.bindRowHeight : 22
+      Layout.bottomMargin: root.isMinimal ? 0 : 1
 
       property bool editing: false
 
       Flow {
+        visible: !root.isMinimal
+        Layout.row: 0
+        Layout.column: 0
         Layout.preferredWidth: 220
         Layout.alignment: Qt.AlignVCenter
         spacing: 3
@@ -400,16 +473,45 @@ Item {
           Rectangle {
             width: keyText.implicitWidth + 10
             height: 18
-            color: getKeyColor(modelData)
+            color: root.getKeyColor(modelData)
             radius: 3
             NText {
               id: keyText
               anchors.centerIn: parent
-              text: getKeyLabel(modelData)
+              text: root.getKeyLabel(modelData)
               font.pointSize: text.length > 12 ? 7 : 8
               font.weight: Font.Bold
-              color: getKeyTextColor(modelData)
+              color: root.getKeyTextColor(modelData)
             }
+          }
+        }
+      }
+
+      Row {
+        id: minimalKeyRow
+        visible: root.isMinimal
+        Layout.row: 0
+        Layout.column: 2
+        Layout.preferredWidth: implicitWidth
+        Layout.minimumWidth: implicitWidth
+        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+        spacing: 3 * Style.uiScaleRatio
+        property var tokens: String(itemData.keys || "").split(" + ")
+
+        Repeater {
+          model: minimalKeyRow.tokens
+          NText {
+            text: {
+              if (index === 0)
+                return root.getKeyLabel(modelData);
+              var previous = minimalKeyRow.tokens[index - 1];
+              var separator = root.isModifierKey(previous) && root.isModifierKey(modelData) ? " " : " + ";
+              return separator + root.getKeyLabel(modelData);
+            }
+            font.pointSize: Style.fontSizeS
+            font.weight: root.isModifierKey(modelData) ? Font.Normal : Font.DemiBold
+            color: root.getKeyTextColor(modelData)
+            opacity: root.isModifierKey(modelData) ? 0.7 : 1
           }
         }
       }
@@ -417,7 +519,10 @@ Item {
       // Described bind: plain text (unchanged behaviour)
       NText {
         visible: !itemData.undescribed
+        Layout.row: 0
+        Layout.column: root.isMinimal ? 0 : 1
         Layout.fillWidth: true
+        Layout.minimumWidth: 0
         Layout.alignment: Qt.AlignVCenter
         text: itemData.desc
         font.pointSize: Style.fontSizeXS
@@ -428,7 +533,10 @@ Item {
       // Undescribed bind: placeholder + add-description / hide actions
       NText {
         visible: itemData.undescribed && !bindRow.editing
+        Layout.row: 0
+        Layout.column: root.isMinimal ? 0 : 1
         Layout.fillWidth: true
+        Layout.minimumWidth: 0
         Layout.alignment: Qt.AlignVCenter
         text: pluginApi?.tr("panel.no-description")
         font.pointSize: Style.fontSizeXS
@@ -446,44 +554,59 @@ Item {
       NTextInput {
         id: descInput
         visible: itemData.undescribed && bindRow.editing
+        Layout.row: 0
+        Layout.column: root.isMinimal ? 0 : 1
         Layout.fillWidth: true
+        Layout.minimumWidth: 0
         Layout.preferredHeight: Style.baseWidgetSize
         placeholderText: pluginApi?.tr("panel.add-description-placeholder")
       }
 
-      NIconButton {
-        visible: itemData.undescribed && bindRow.editing
-        Layout.preferredHeight: 18
-        icon: "check"
-        tooltipText: pluginApi?.tr("panel.save-description")
-        onClicked: {
-          root.saveBindDescription(itemData.bindId, descInput.text);
-          bindRow.editing = false;
+      RowLayout {
+        Layout.row: 0
+        Layout.column: root.isMinimal ? 1 : 2
+        Layout.alignment: Qt.AlignVCenter
+        visible: itemData.undescribed
+        spacing: root.isMinimal ? 2 * Style.uiScaleRatio : Style.marginS
+
+        NIconButton {
+          visible: itemData.undescribed && bindRow.editing
+          Layout.preferredWidth: root.isMinimal ? 18 * Style.uiScaleRatio : implicitWidth
+          Layout.preferredHeight: root.isMinimal ? 18 * Style.uiScaleRatio : 18
+          icon: "check"
+          tooltipText: pluginApi?.tr("panel.save-description")
+          onClicked: {
+            root.saveBindDescription(itemData.bindId, descInput.text);
+            bindRow.editing = false;
+          }
         }
-      }
 
-      NIconButton {
-        visible: itemData.undescribed && bindRow.editing
-        Layout.preferredHeight: 18
-        icon: "close"
-        tooltipText: pluginApi?.tr("panel.cancel")
-        onClicked: { bindRow.editing = false; }
-      }
+        NIconButton {
+          visible: itemData.undescribed && bindRow.editing
+          Layout.preferredWidth: root.isMinimal ? 18 * Style.uiScaleRatio : implicitWidth
+          Layout.preferredHeight: root.isMinimal ? 18 * Style.uiScaleRatio : 18
+          icon: "close"
+          tooltipText: pluginApi?.tr("panel.cancel")
+          onClicked: { bindRow.editing = false; }
+        }
 
-      NIconButton {
-        visible: itemData.undescribed && !bindRow.editing
-        Layout.preferredHeight: 18
-        icon: "edit"
-        tooltipText: pluginApi?.tr("panel.add-description")
-        onClicked: { bindRow.editing = true; descInput.text = ""; descInput.inputItem.forceActiveFocus(); }
-      }
+        NIconButton {
+          visible: itemData.undescribed && !bindRow.editing
+          Layout.preferredWidth: root.isMinimal ? 18 * Style.uiScaleRatio : implicitWidth
+          Layout.preferredHeight: root.isMinimal ? 18 * Style.uiScaleRatio : 18
+          icon: "edit"
+          tooltipText: pluginApi?.tr("panel.add-description")
+          onClicked: { bindRow.editing = true; descInput.text = ""; descInput.inputItem.forceActiveFocus(); }
+        }
 
-      NIconButton {
-        visible: itemData.undescribed && !bindRow.editing
-        Layout.preferredHeight: 18
-        icon: "eye-off"
-        tooltipText: pluginApi?.tr("panel.hide-bind")
-        onClicked: { root.hideBind(itemData.bindId); }
+        NIconButton {
+          visible: itemData.undescribed && !bindRow.editing
+          Layout.preferredWidth: root.isMinimal ? 18 * Style.uiScaleRatio : implicitWidth
+          Layout.preferredHeight: root.isMinimal ? 18 * Style.uiScaleRatio : 18
+          icon: "eye-off"
+          tooltipText: pluginApi?.tr("panel.hide-bind")
+          onClicked: { root.hideBind(itemData.bindId); }
+        }
       }
     }
   }
@@ -503,19 +626,52 @@ Item {
     return root.keyColorDefault;
   }
 
+  function isModifierKey(keyName) {
+    var key = String(keyName || "").toLowerCase();
+    return key === "super" || key === "super_l" || key === "super_r" ||
+           key === "ctrl" || key === "control" || key === "shift" || key === "alt" ||
+           key === "mod2" || key === "mod3" || key === "mod5";
+  }
+
+  function getMinimalKeyColorOverride(keyName) {
+    if (keyName === "Super") return root.keyColorSuperOverride;
+    if (keyName === "Ctrl") return root.keyColorCtrlOverride;
+    if (keyName === "Shift") return root.keyColorShiftOverride;
+    if (keyName === "Alt" && cfg.keyColorAlt && cfg.keyColorAlt !== defaults.keyColorAlt) return cfg.keyColorAlt;
+    if (keyName.startsWith("XF86") && cfg.keyColorXF86 && cfg.keyColorXF86 !== defaults.keyColorXF86) return cfg.keyColorXF86;
+    if ((keyName === "PRINT" || keyName === "Print") && cfg.keyColorPrint && cfg.keyColorPrint !== defaults.keyColorPrint) return cfg.keyColorPrint;
+    if (keyName.match(/^[0-9]$/) && cfg.keyColorNumeric && cfg.keyColorNumeric !== defaults.keyColorNumeric) return cfg.keyColorNumeric;
+    if ((keyName.includes("MOUSE") || keyName.includes("Wheel")) && cfg.keyColorMouse && cfg.keyColorMouse !== defaults.keyColorMouse) return cfg.keyColorMouse;
+    if (keyName === "Mod2") return root.keyColorMod2Override;
+    if (keyName === "Mod3") return root.keyColorMod3Override;
+    if (keyName === "Mod5") return root.keyColorMod5Override;
+    if (cfg.keyColorDefault && cfg.keyColorDefault !== defaults.keyColorDefault) return cfg.keyColorDefault;
+    return "";
+  }
+
   function getKeyTextColor(keyName) {
-    if (keyName === "Super") return root.keyTextSuperOverride || root.keyLabelColor;
-    if (keyName === "Ctrl")  return root.keyTextCtrlOverride  || root.keyLabelColor;
-    if (keyName === "Shift") return root.keyTextShiftOverride || root.keyLabelColor;
-    if (keyName === "Alt") return root.keyTextAltOverride || root.keyLabelColor;
-    if (keyName.startsWith("XF86")) return root.keyTextXF86Override || root.keyLabelColor;
-    if (keyName === "PRINT" || keyName === "Print") return root.keyTextPrintOverride || root.keyLabelColor;
-    if (keyName.match(/^[0-9]$/)) return root.keyTextNumericOverride || root.keyLabelColor;
-    if (keyName.includes("MOUSE") || keyName.includes("Wheel")) return root.keyTextMouseOverride || root.keyLabelColor;
-    if (keyName === "Mod2") return root.keyTextMod2Override || root.keyLabelColor;
-    if (keyName === "Mod3") return root.keyTextMod3Override || root.keyLabelColor;
-    if (keyName === "Mod5") return root.keyTextMod5Override || root.keyLabelColor;
-    return root.keyTextDefaultOverride || root.keyLabelColor;
+    var textOverride = "";
+    if (keyName === "Super") textOverride = root.keyTextSuperOverride;
+    else if (keyName === "Ctrl") textOverride = root.keyTextCtrlOverride;
+    else if (keyName === "Shift") textOverride = root.keyTextShiftOverride;
+    else if (keyName === "Alt") textOverride = root.keyTextAltOverride;
+    else if (keyName.startsWith("XF86")) textOverride = root.keyTextXF86Override;
+    else if (keyName === "PRINT" || keyName === "Print") textOverride = root.keyTextPrintOverride;
+    else if (keyName.match(/^[0-9]$/)) textOverride = root.keyTextNumericOverride;
+    else if (keyName.includes("MOUSE") || keyName.includes("Wheel")) textOverride = root.keyTextMouseOverride;
+    else if (keyName === "Mod2") textOverride = root.keyTextMod2Override;
+    else if (keyName === "Mod3") textOverride = root.keyTextMod3Override;
+    else if (keyName === "Mod5") textOverride = root.keyTextMod5Override;
+    else textOverride = root.keyTextDefaultOverride;
+
+    if (textOverride) return textOverride;
+    if (root.isMinimal) {
+      if (root.keyLabelColorOverride) return root.keyLabelColorOverride;
+      var keyColorOverride = root.getMinimalKeyColorOverride(keyName);
+      if (keyColorOverride) return keyColorOverride;
+      return root.isModifierKey(keyName) ? Color.mOnSurfaceVariant : Color.mOnSurface;
+    }
+    return root.keyLabelColor;
   }
 
   // Display label for a key token. Lets users rename the generic X11 modifier
@@ -645,7 +801,7 @@ Item {
   }
 
   function distributeCategories() {
-    var numCols = root.columnCount;
+    var numCols = root.effectiveColumnCount;
 
     // Calculate weights for each category
     var catData = [];

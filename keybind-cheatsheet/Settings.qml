@@ -44,8 +44,9 @@ ColumnLayout {
   property bool editShowUndescribedBinds: cfg.showUndescribedBinds ?? defaults.showUndescribedBinds ?? false
   property bool editSplitLargeWorkspaceCategory: cfg.splitLargeWorkspaceCategory ?? defaults.splitLargeWorkspaceCategory ?? true
   property int editWorkspaceSplitThreshold: cfg.workspaceSplitThreshold ?? defaults.workspaceSplitThreshold ?? 12
+  property string valueAppearance: cfg.appearance ?? defaults.appearance ?? "classic"
 
-  // Live-preview properties for colors (mirror current pluginSettings; written via _applyPreview).
+  // Live-preview properties for appearance and colors (mirror current pluginSettings; written via _applyPreview).
   // All background color fields are stored as string (hex) for empty-string support.
   property string valueKeyColorSuper:   cfg.keyColorSuper   ?? defaults.keyColorSuper   ?? ""
   property string valueKeyColorCtrl:    cfg.keyColorCtrl    ?? defaults.keyColorCtrl    ?? ""
@@ -795,6 +796,8 @@ ColumnLayout {
                 root.editShowUndescribedBinds = defaults.showUndescribedBinds ?? false;
                 root.editSplitLargeWorkspaceCategory = defaults.splitLargeWorkspaceCategory ?? true;
                 root.editWorkspaceSplitThreshold = defaults.workspaceSplitThreshold ?? 12;
+                root.valueAppearance = defaults.appearance ?? "classic";
+                root._applyPreview("appearance", root.valueAppearance);
 
                 widthInput.text = root.editWindowWidth.toString();
                 heightInput.text = root.editWindowHeight.toString();
@@ -914,6 +917,56 @@ ColumnLayout {
         color: Color.mOnSurfaceVariant
         pointSize: Style.fontSizeM
         wrapMode: Text.WordWrap
+      }
+
+
+      // ===== Panel Style =====
+      NBox {
+        Layout.fillWidth: true
+        Layout.preferredHeight: styleContent.implicitHeight + Style.marginM * 2
+        color: Color.mSurfaceVariant
+
+        ColumnLayout {
+          id: styleContent
+          anchors.fill: parent
+          anchors.margins: Style.marginM
+          spacing: Style.marginS
+
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: Style.marginM
+
+            NText {
+              Layout.fillWidth: true
+              text: pluginApi?.tr("settings.appearance-style")
+              pointSize: Style.fontSizeL
+              font.weight: Style.fontWeightBold
+              color: Color.mOnSurface
+            }
+
+            NComboBox {
+              Layout.preferredWidth: 180 * Style.uiScaleRatio
+              Layout.preferredHeight: Style.baseWidgetSize
+              model: [
+                { "name": pluginApi?.tr("settings.appearance-classic"), "key": "classic" },
+                { "name": pluginApi?.tr("settings.appearance-minimal"), "key": "minimal" }
+              ]
+              currentKey: root.valueAppearance
+              onSelected: key => {
+                root.valueAppearance = key;
+                root._applyPreview("appearance", key);
+              }
+            }
+          }
+
+          NText {
+            Layout.fillWidth: true
+            text: pluginApi?.tr("settings.appearance-style-hint")
+            color: Color.mOnSurfaceVariant
+            pointSize: Style.fontSizeS
+            wrapMode: Text.WordWrap
+          }
+        }
       }
 
       // ===== Live Preview =====
@@ -1473,6 +1526,7 @@ ColumnLayout {
     pluginApi.pluginSettings.showUndescribedBinds = root.editShowUndescribedBinds;
     pluginApi.pluginSettings.splitLargeWorkspaceCategory = root.editSplitLargeWorkspaceCategory;
     pluginApi.pluginSettings.workspaceSplitThreshold = root.editWorkspaceSplitThreshold;
+    pluginApi.pluginSettings.appearance = root.valueAppearance;
 
     pluginApi.pluginSettings.keyColorAlt = root.valueKeyColorAlt.toString();
     pluginApi.pluginSettings.keyColorXF86 = root.valueKeyColorXF86.toString();

@@ -1,7 +1,7 @@
 {
   "id": "keybind-cheatsheet",
   "name": "Keybind Cheatsheet",
-  "version": "3.7.4",
+  "version": "3.8.0",
   "minNoctaliaVersion": "3.6.0",
   "author": "blacku",
   "license": "MIT",
@@ -32,6 +32,7 @@
       "windowWidth": 1400,
       "windowHeight": 850,
       "autoHeight": true,
+      "appearance": "classic",
       "columnCount": 3,
       "modKeyVariable": "$mod",
       "hyprlandConfigPath": "~/.config/hypr/hyprland.conf",

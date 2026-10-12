@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.8.0] - 2026-10-11
+
+### Features
+
+- Added a **Classic** (default) / **Minimal** panel appearance selector. Minimal uses compact 22px rows, theme-aware category headings and key text, muted modifiers, semibold trigger keys, bounded search width, and screen-responsive columns and gutters.
+- The Minimal layout keeps descriptions and existing edit/hide actions on the left and key chords on the right. Explicit text and key-color overrides remain available.
+
 ## [3.7.3] - 2026-05-25
 
 ### Fixes
